@@ -5,10 +5,9 @@ bp = Blueprint('auth', __name__)
 # Simulation d'une base de données d'utilisateurs
 # Rôles : 'admin', 'contre-maitre', 'ouvrier'
 USERS = {
-    "admin": {"password": "admin", "role": "admin", "nom": "Administrateur Système"},
-    "cm1": {"password": "cm1", "role": "contre-maitre", "nom": "Chef de chantier 1"},
-    "ouvrier1": {"password": "ouv1", "role": "ouvrier", "nom": "Jean Dupont"},
-    "ouvrier2": {"password": "ouv2", "role": "ouvrier", "nom": "Marc Vandame"}
+    "admin@hotmail.com": {"password": "1", "role": "admin", "nom": "Administrateur"},
+    "cm@hotmail.com": {"password": "2", "role": "contre-maitre", "nom": "Contre-maître"},
+    "ouvrier@hotmail.com": {"password": "3", "role": "ouvrier", "nom": "Ouvrier"}
 }
 
 
@@ -31,8 +30,8 @@ def login():
             if user['role'] == 'admin':
                 return redirect(url_for('auth.admin_dashboard'))
             elif user['role'] == 'contre-maitre':
-                # En attendant de créer le tableau de bord du contre-maître, on renvoie vers l'accueil
-                return redirect('/')
+                # Redirection vers le tableau de bord du contre-maître
+                return redirect(url_for('interventions.cm_dashboard'))
             else:
                 # Les ouvriers vont directement sur la liste des interventions
                 return redirect(url_for('interventions.page_liste'))
@@ -86,3 +85,10 @@ def admin_delete_user(identifiant):
         del USERS[identifiant]
 
     return redirect(url_for('auth.admin_dashboard'))
+
+
+@bp.route('/api/ouvriers')
+def api_ouvriers():
+    """Renvoie la liste des ouvriers pour l'assignation par le contre-maître"""
+    ouvriers = [{"identifiant": k, "nom": v["nom"]} for k, v in USERS.items() if v["role"] == "ouvrier"]
+    return jsonify(ouvriers)

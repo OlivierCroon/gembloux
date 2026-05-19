@@ -1,10 +1,196 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <title>$Title$</title>
-</head>
-<body>
-$END$
-</body>
-</html>
+{% extends "base.html" %}
+
+{% block content %}
+    <!-- NOUVEAU : Importation de Leaflet pour afficher une carte gratuite (OpenStreetMap) -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <style>
+        .btn-photo-box { background-color: #6c757d; color: white; padding: 15px; text-align: center; border-radius: 8px; cursor: pointer; margin-bottom: 10px; font-weight: bold; }
+        .preview-container { text-align: center; margin-bottom: 15px; display: none; }
+        .preview-image { max-width: 100%; max-height: 250px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.2); display: block; margin: 0 auto; }
+        .btn-gps { background-color: #17a2b8; color: white; border: none; padding: 10px; border-radius: 6px; cursor: pointer; width: 100%; font-weight: bold; margin-bottom: 5px; }
+
+        .input-inline { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; font-size: 16px; margin-top: 5px; font-family: inherit; }
+    </style>
+
+    <div class="carte">
+        <h2 style="color: #0056b3; margin-top: 0;">Signaler un problème</h2>
+
+        <div class="form-group">
+            <label>1. Photo de la situation :</label>
+            <div class="btn-photo-box" onclick="document.getElementById('photo-signalement').click()">📸 Prendre / Choisir une photo</div>
+            <input type="file" id="photo-signalement" accept="image/*" capture="environment" style="display:none" onchange="previewPhoto(event)">
+
+            <div id="container-preview" class="preview-container">
+                <img id="preview" class="preview-image">
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label>2. Type de lieu :</label>
+            <select id="type_lieu" class="input-inline" onchange="toggleLieu()">
+                <option value="">-- Sélectionner --</option>
+                <option value="Voirie">Voirie (Rue, trottoir...)</option>
+                <option value="Bâtiment">Bâtiment communal</option>
+                <option value="Plaine de jeux">Plaine de jeux</option>
+                <option value="Autre">Autre</option>
+            </select>
+        </div>
+
+        <!-- Section GPS si Voirie -->
+        <div id="zone-voirie" style="display: none; background: #f8f9fa; padding: 10px; border-radius: 8px; margin-bottom: 15px;">
+            <label>Position GPS :</label>
+            <button class="btn-gps" onclick="obtenirGPS()">📍 Obtenir ma position actuelle</button>
+            <p id="gps-status" style="margin: 5px 0 0 0; font-size: 0.9em; font-style: italic; color: #666;">En attente...</p>
+            <input type="hidden" id="gps-lat">
+            <input type="hidden" id="gps-lng">
+
+            <!-- NOUVEAU : Conteneur pour la carte, masqué par défaut -->
+            <div id="map-container" style="height: 250px; width: 100%; margin-top: 15px; display: none; border-radius: 8px; z-index: 1;"></div>
+        </div>
+
+        <!-- Section Bâtiment -->
+        <div id="zone-batiment" style="display: none; background: #f8f9fa; padding: 10px; border-radius: 8px; margin-bottom: 15px;">
+            <div class="form-group">
+                <label>Nom du bâtiment :</label>
+                <input type="text" id="batiment-nom" class="input-inline" placeholder="Ex: Hôtel de Ville, École de Grand-Manil...">
+            </div>
+            <div class="form-group">
+                <label>Étage :</label>
+                <input type="text" id="batiment-etage" class="input-inline" placeholder="Ex: RDC, 1er...">
+            </div>
+            <div class="form-group">
+                <label>Local :</label>
+                <input type="text" id="batiment-local" class="input-inline" placeholder="Ex: Bureau 12, Cuisine...">
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label>3. Description du travail à réaliser :</label>
+            <textarea id="description" class="input-inline" style="height: 120px; resize: vertical;" placeholder="Décrivez le problème constaté..."></textarea>
+        </div>
+
+        <button class="btn-submit" style="background-color: #28a745;" onclick="envoyerSignalement()">Envoyer le signalement</button>
+    </div>
+
+    <script>
+        function previewPhoto(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    document.getElementById('preview').src = e.target.result;
+                    document.getElementById('container-preview').style.display = 'block';
+                }
+                reader.readAsDataURL(file);
+            }
+        }
+
+        function toggleLieu() {
+            const typeLieu = document.getElementById('type_lieu').value;
+            document.getElementById('zone-voirie').style.display = (typeLieu === 'Voirie') ? 'block' : 'none';
+            document.getElementById('zone-batiment').style.display = (typeLieu === 'Bâtiment') ? 'block' : 'none';
+
+            // Correction pour redimensionner la carte si elle était déjà affichée mais cachée par le menu déroulant
+            if (typeLieu === 'Voirie' && window.map) {
+                setTimeout(() => { window.map.invalidateSize(); }, 100);
+            }
+        }
+
+        function obtenirGPS() {
+            const statusLabel = document.getElementById('gps-status');
+
+            // Vérification stricte du contexte sécurisé (HTTPS ou localhost) exigé par Chrome/Safari
+            if (window.isSecureContext === false) {
+                statusLabel.innerText = "Erreur : Le navigateur bloque le GPS car la connexion n'est pas sécurisée (HTTP).";
+                statusLabel.style.color = "#dc3545";
+                return;
+            }
+
+            if ("geolocation" in navigator) {
+                statusLabel.innerText = "Recherche de la position en cours (autorisez l'accès)...";
+                statusLabel.style.color = "#007bff";
+
+                navigator.geolocation.getCurrentPosition(
+                    function(position) {
+                        const lat = position.coords.latitude.toFixed(6);
+                        const lng = position.coords.longitude.toFixed(6);
+                        document.getElementById('gps-lat').value = lat;
+                        document.getElementById('gps-lng').value = lng;
+                        statusLabel.innerText = `Position captée : ${lat}, ${lng}`;
+                        statusLabel.style.color = "#28a745";
+
+                        // NOUVEAU : Affichage de la carte
+                        document.getElementById('map-container').style.display = 'block';
+
+                        if (typeof window.map === 'undefined') {
+                            // Initialiser la carte si elle n'existe pas encore
+                            window.map = L.map('map-container').setView([lat, lng], 17);
+                            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                            }).addTo(window.map);
+                            window.marker = L.marker([lat, lng]).addTo(window.map);
+                        } else {
+                            // Mettre à jour la carte existante
+                            window.map.setView([lat, lng], 17);
+                            window.marker.setLatLng([lat, lng]);
+                        }
+                        // Forcer le redimensionnement pour éviter les bugs d'affichage gris
+                        setTimeout(() => { window.map.invalidateSize(); }, 100);
+
+                    },
+                    function(error) {
+                        let msg = "Erreur inconnue.";
+                        if (error.code === 1) msg = "Erreur : Vous avez refusé l'accès au GPS.";
+                        if (error.code === 2) msg = "Erreur : Position introuvable (Activez votre puce GPS).";
+                        if (error.code === 3) msg = "Erreur : Le signal GPS a mis trop de temps à répondre.";
+
+                        statusLabel.innerText = msg;
+                        statusLabel.style.color = "#dc3545";
+                    },
+                    // Ajout d'un timeout de 10 secondes pour éviter de tourner dans le vide
+                    { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+                );
+            } else {
+                statusLabel.innerText = "Erreur : La géolocalisation n'est pas supportée par votre appareil.";
+                statusLabel.style.color = "#dc3545";
+            }
+        }
+
+        function envoyerSignalement() {
+            const typeLieu = document.getElementById('type_lieu').value;
+            const description = document.getElementById('description').value;
+
+            if (!typeLieu || !description) {
+                alert("Veuillez choisir un type de lieu et écrire une description.");
+                return;
+            }
+
+            const payload = {
+                type_lieu: typeLieu,
+                description: description,
+                lat: document.getElementById('gps-lat').value,
+                lng: document.getElementById('gps-lng').value,
+                batiment: document.getElementById('batiment-nom').value,
+                etage: document.getElementById('batiment-etage').value,
+                local: document.getElementById('batiment-local').value
+            };
+
+            fetch('/interventions/api/nouvelle', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if(data.status === "success") {
+                    alert("Signalement enregistré ! Il sera traité par le contre-maître.");
+                    window.location.href = '/';
+                } else {
+                    alert("Erreur lors de l'enregistrement.");
+                }
+            });
+        }
+    </script>
+{% endblock %}

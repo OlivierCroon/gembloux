@@ -1,10 +1,23 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>Title</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gem-Travaux</title>
+    <!-- Ajout de ?v=1.0 pour forcer le navigateur à vider son cache et recharger le style -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=1.0">
 </head>
 <body>
-
+    <nav class="navbar">
+        <div class="logo">Ville de Gembloux - Travaux</div>
+        <ul class="menu">
+            <li><a href="/">Accueil</a></li>
+            <li><a href="/interventions/">Interventions</a></li>
+            <li><a href="/auth/login">Déconnexion</a></li>
+        </ul>
+    </nav>
+    <div class="container">
+        {% block content %}{% endblock %}
+    </div>
 </body>
 </html>

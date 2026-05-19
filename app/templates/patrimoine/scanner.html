@@ -1,10 +1,32 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <title>$Title$</title>
-</head>
-<body>
-$END$
-</body>
-</html>
+{% extends "base.html" %}
+
+{% block content %}
+    <div class="carte" style="text-align: center;">
+        <h2 style="color: #0056b3; margin-top: 0;">Scanner un équipement</h2>
+        <p style="color: #666;">Veuillez approcher le QR Code de la caméra ou entrer le code manuellement.</p>
+
+        <div style="margin: 20px auto; border: 2px dashed #007bff; border-radius: 8px; padding: 50px; background: #f8f9fa; max-width: 400px;">
+            <!-- Zone pour la future caméra -->
+            <span style="color: #007bff; font-weight: bold;">[ Caméra prête ]</span>
+        </div>
+
+        <div class="form-group" style="max-width: 400px; margin: 0 auto; text-align: left;">
+            <label for="manual_code">Code de l'équipement :</label>
+            <input type="text" id="manual_code" placeholder="Ex: MOB-123">
+        </div>
+        <div style="max-width: 400px; margin: 15px auto 0;">
+            <button class="btn-submit" onclick="simulerScan()">Valider le code</button>
+        </div>
+    </div>
+
+    <script>
+        function simulerScan() {
+            const code = document.getElementById('manual_code').value;
+            if (code) {
+                window.location.href = '/patrimoine/scan/' + code;
+            } else {
+                alert('Veuillez entrer un code');
+            }
+        }
+    </script>
+{% endblock %}

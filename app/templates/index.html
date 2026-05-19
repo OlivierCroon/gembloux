@@ -1,10 +1,12 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Title</title>
-</head>
-<body>
+{% extends "base.html" %}
 
-</body>
-</html>
+{% block content %}
+    <div class="carte" style="text-align: center;">
+        <h1 style="color: #0056b3; margin-top: 0;">Tableau de bord</h1>
+        <div class="grid-menu" style="margin-top: 20px;">
+            <a href="/interventions/" class="btn-menu">Mes Interventions</a>
+            <a href="/patrimoine/" class="btn-menu">Scanner Patrimoine (QR)</a>
+            <a href="/magasin/stocks" class="btn-menu">Consulter Magasin</a>
+        </div>
+    </div>
+{% endblock %}

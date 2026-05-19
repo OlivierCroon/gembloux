@@ -1,10 +1,385 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Title</title>
-</head>
-<body>
+{% extends "base.html" %}
 
-</body>
-</html>
+{% block content %}
+    <style>
+        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.6); overflow-y: auto; }
+        .modal-content { background-color: #fff; margin: 2% auto; padding: 15px; border-radius: 8px; width: 95%; max-width: 800px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); position: relative; }
+        .close { color: #aaa; float: right; font-size: 28px; font-weight: bold; padding: 5px; cursor: pointer; }
+        .tabs { display: flex; border-bottom: 2px solid #eee; margin-bottom: 15px; overflow-x: auto; }
+        .tab { padding: 12px 15px; cursor: pointer; border-bottom: 3px solid transparent; font-weight: bold; color: #666; white-space: nowrap; flex-grow: 1; text-align: center; }
+        .tab.active { border-bottom: 3px solid #007bff; color: #007bff; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        .table-responsive { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; margin-top: 10px; }
+        .dynamic-table { width: 100%; min-width: 450px; border-collapse: collapse; }
+        .dynamic-table th, .dynamic-table td { padding: 10px 8px; border: 1px solid #ddd; text-align: left; }
+        .dynamic-table th { background-color: #f8f9fa; font-size: 0.9em; }
+        .input-inline { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; font-size: 16px; }
+        .btn-action { padding: 12px; border-radius: 6px; border: none; color: white; font-weight: bold; cursor: pointer; margin-top: 10px; width: 100%; font-size: 0.95em; text-decoration: none; display: inline-block; }
+        .btn-add { background-color: #17a2b8; color: white; border: none; padding: 10px; border-radius: 4px; cursor: pointer; margin: 10px 0; width: 100%; }
+        .status-stock { font-weight: bold; font-size: 0.85em; }
+        .stock-ok { color: #28a745; }
+        .stock-ko { color: #dc3545; }
+        .section-title { background: #f1f1f1; padding: 8px 12px; margin: 20px 0 10px 0; font-weight: bold; border-radius: 4px; border-left: 4px solid #007bff; }
+        .btn-photo-box { background-color: #6c757d; color: white; padding: 15px; text-align: center; border-radius: 8px; cursor: pointer; margin-bottom: 15px; }
+        .badge-assigne { display: inline-block; padding: 5px 10px; border-radius: 15px; font-size: 0.8em; font-weight: bold; color: white; background-color: #6c757d; }
+
+        /* Aperçu Photos */
+        .preview-image { max-width: 100%; max-height: 300px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.2); display: block; margin: 0 auto; }
+        .preview-container { text-align: center; margin-bottom: 15px; display: none; }
+
+        @media (min-width: 768px) {
+            .btn-action { width: auto; min-width: 150px; }
+            .btn-add { width: auto; }
+            .flex-pc { display: flex; gap: 10px; }
+        }
+    </style>
+
+    <datalist id="liste-articles-stock"></datalist>
+    <datalist id="liste-ouvriers"></datalist>
+
+    <div class="carte" style="margin-top: 20px;">
+        <h2>Bons de travail assignés</h2>
+
+        <!-- Bouton accès direct pour signaler un problème -->
+        <div style="margin-bottom: 20px;">
+            <a href="/interventions/nouvelle" class="btn-action" style="background-color: #28a745; width: 100%; text-align: center; box-sizing: border-box;">+ Signaler un problème (Terrain)</a>
+        </div>
+
+        <div id="liste-interventions">
+            <p>Chargement des interventions...</p>
+        </div>
+    </div>
+
+    <!-- Fenêtre Modale Multi-Phases -->
+    <div id="interventionModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="fermerModal()">&times;</span>
+            <h3 id="modal-atal" style="margin-top:0;"></h3>
+
+            <p><strong>Lieu :</strong> <span id="p1-lieu"></span></p>
+
+            <div class="tabs">
+                <div class="tab active" onclick="switchTab(0)">Phase 1 : Préparation</div>
+                <div class="tab" onclick="switchTab(1)">Phase 2 : Exécution</div>
+            </div>
+
+            <!-- PHASE 1 : PRÉPARATION -->
+            <div id="tab0" class="tab-content active">
+                <div class="section-title">Preuve avant travaux (Photo)</div>
+                <div class="btn-photo-box" onclick="document.getElementById('p1-photo-avant').click()">📸 Prendre / Choisir Photo AVANT</div>
+                <input type="file" id="p1-photo-avant" accept="image/*" capture="environment" style="display:none" onchange="previewPhoto(event, 'preview-avant')">
+
+                <div id="container-preview-avant" class="preview-container">
+                    <img id="preview-avant" class="preview-image">
+                </div>
+
+                <div class="section-title">Matériaux & Stock (Prévus)</div>
+                <div class="table-responsive">
+                    <table class="dynamic-table" id="table-materiaux">
+                        <thead>
+                            <tr>
+                                <th>Article (Suggestions stock)</th>
+                                <th style="width: 70px;">Qté</th>
+                                <th>État Stock</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbody-materiaux"></tbody>
+                    </table>
+                </div>
+                <button class="btn-add" onclick="ajouterLigneMateriau()">+ Ajouter un article</button>
+                <div class="flex-pc" style="margin-top: 20px;">
+                    <button class="btn-action" style="background-color: #007bff; margin-bottom: 10px;" onclick="verifierStocks()">Vérifier Stock</button>
+                    <button class="btn-action" style="background-color: #ffc107; color: #000; margin-bottom: 10px;" onclick="commanderManquant()">Générer Bon de Commande</button>
+                </div>
+            </div>
+
+            <!-- PHASE 2 : EXÉCUTION -->
+            <div id="tab1" class="tab-content">
+                <div class="section-title">Journal des prestations</div>
+                <div class="table-responsive">
+                    <table class="dynamic-table">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Agent</th>
+                                <th style="width: 70px;">Heures</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbody-heures"></tbody>
+                    </table>
+                </div>
+
+                <div style="display: flex; gap: 10px; margin-top: 10px; flex-wrap: wrap;">
+                    <button class="btn-add" style="margin-top: 0; flex: 1; min-width: 200px;" onclick="ajouterLigneHeure('', true)">+ Ajouter ouvrier (Même date)</button>
+                    <button class="btn-add" style="margin-top: 0; flex: 1; min-width: 200px; background-color: #6c757d;" onclick="ajouterLigneHeure('')">+ Nouvelle date</button>
+                </div>
+
+                <div class="section-title">Matériaux supplémentaires (Imprévus)</div>
+                <div class="table-responsive">
+                    <table class="dynamic-table" id="table-materiaux-p2">
+                        <thead>
+                            <tr>
+                                <th>Article (Suggestions stock)</th>
+                                <th style="width: 70px;">Qté</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbody-materiaux-p2"></tbody>
+                    </table>
+                </div>
+                <button class="btn-add" onclick="ajouterLigneMateriauP2()">+ Ajouter un article imprévu</button>
+
+                <div class="section-title">Remarques</div>
+                <textarea id="p2-remarque" class="input-inline" style="width: 100%; height: 80px; resize: none; box-sizing: border-box;"></textarea>
+
+                <div class="section-title">Clôture</div>
+                <div class="btn-photo-box" style="background-color: #28a745;" onclick="document.getElementById('p2-photo-apres').click()">📸 Prendre / Choisir Photo APRÈS</div>
+                <input type="file" id="p2-photo-apres" accept="image/*" capture="environment" style="display:none" onchange="previewPhoto(event, 'preview-apres')">
+
+                <div id="container-preview-apres" class="preview-container">
+                    <img id="preview-apres" class="preview-image">
+                </div>
+
+                <button class="btn-action" style="background-color: #28a745; width: 100%; padding: 15px;" onclick="finaliserIntervention()">
+                    VALIDER SORTIE STOCK ET CLÔTURER
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let interventionsData = [];
+        let currentStocks = [];
+        let currentIndex = -1;
+
+        // Charger les stocks pour le datalist
+        function chargerStocks() {
+            fetch('/magasin/api/stocks')
+                .then(r => r.json())
+                .then(data => {
+                    currentStocks = data;
+                    const datalist = document.getElementById('liste-articles-stock');
+                    datalist.innerHTML = '';
+                    data.forEach(item => {
+                        const option = document.createElement('option');
+                        option.value = item.nom;
+                        datalist.appendChild(option);
+                    });
+                });
+        }
+        chargerStocks();
+
+        // Charger la liste des ouvriers pour l'auto-complétion de la Phase 2
+        function chargerOuvriers() {
+            fetch('/auth/api/ouvriers')
+                .then(r => r.json())
+                .then(data => {
+                    const datalist = document.getElementById('liste-ouvriers');
+                    datalist.innerHTML = '';
+                    data.forEach(o => {
+                        datalist.innerHTML += `<option value="${o.nom}">`;
+                    });
+                });
+        }
+        chargerOuvriers();
+
+        // Chargement initial des interventions (filtrées par le backend pour l'ouvrier)
+        fetch('/interventions/api/donnees')
+            .then(response => response.json())
+            .then(data => {
+                interventionsData = data;
+                const container = document.getElementById('liste-interventions');
+                container.innerHTML = '';
+
+                if (data.length === 0) {
+                    container.innerHTML = '<p style="color: #666; font-style: italic;">Aucune intervention ne vous est assignée pour le moment.</p>';
+                } else {
+                    data.forEach((intervention, index) => {
+
+                        // Calcul du style selon le statut (Signalement, Ouvert, Clôturé)
+                        const statutTxt = intervention.statut || "Ouvert";
+                        let badgeStatutStyle = 'background-color: #17a2b8; color: #fff;';
+                        if (statutTxt === 'Signalement') {
+                            badgeStatutStyle = 'background-color: #ffc107; color: #000; border: 1px solid #d39e00;';
+                        } else if (statutTxt.includes('Clôturé')) {
+                            badgeStatutStyle = 'background-color: #28a745; color: #fff;';
+                        }
+
+                        container.innerHTML += `
+                            <div class="carte carte-cliquable" onclick="ouvrirModal(${index})">
+                                <div style="display:flex; justify-content: space-between; align-items: start;">
+                                    <h3 style="margin-top:0;">Note ATAL : ${intervention.note_atal}</h3>
+                                    <span class="badge-assigne" style="${badgeStatutStyle}">${statutTxt}</span>
+                                </div>
+                                <p><strong>Lieu :</strong> ${intervention.lieu}</p>
+                                <p><strong>Tâche :</strong> ${intervention.tache}</p>
+                                <div style="text-align: right; color: #007bff; font-weight: bold;">Gérer Phases 1 & 2 ></div>
+                            </div>`;
+                    });
+                }
+            });
+
+        function ouvrirModal(index) {
+            currentIndex = index;
+            const item = interventionsData[index];
+            document.getElementById('modal-atal').innerText = item.note_atal;
+            document.getElementById('p1-lieu').innerText = item.lieu + " (" + item.adresse + ")";
+
+            // Réinitialiser les champs et les tableaux
+            document.getElementById('tbody-materiaux').innerHTML = '';
+            document.getElementById('tbody-materiaux-p2').innerHTML = '';
+            document.getElementById('tbody-heures').innerHTML = '';
+
+            // Réinitialiser les aperçus photos
+            document.getElementById('p1-photo-avant').value = '';
+            document.getElementById('container-preview-avant').style.display = 'none';
+            document.getElementById('preview-avant').src = '';
+
+            document.getElementById('p2-photo-apres').value = '';
+            document.getElementById('container-preview-apres').style.display = 'none';
+            document.getElementById('preview-apres').src = '';
+
+            switchTab(0);
+            ajouterLigneMateriau();
+
+            // Forcer l'insertion du nom de l'agent assigné pour la toute première ligne
+            const nomAInserer = item.assigne_a ? item.assigne_a : '';
+            ajouterLigneHeure(nomAInserer);
+
+            document.getElementById('interventionModal').style.display = 'block';
+        }
+
+        // --- FONCTION POUR L'APERÇU DES PHOTOS ---
+        function previewPhoto(event, previewId) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const imgElement = document.getElementById(previewId);
+                    imgElement.src = e.target.result;
+                    document.getElementById('container-' + previewId).style.display = 'block';
+                }
+                reader.readAsDataURL(file);
+            }
+        }
+
+        function switchTab(idx) {
+            document.querySelectorAll('.tab').forEach((t, i) => t.classList.toggle('active', i === idx));
+            document.querySelectorAll('.tab-content').forEach((c, i) => c.classList.toggle('active', i === idx));
+        }
+
+        function ajouterLigneMateriau() {
+            const tbody = document.getElementById('tbody-materiaux');
+            const row = tbody.insertRow();
+            row.innerHTML = `
+                <td><input type="text" class="input-inline art-name" list="liste-articles-stock" placeholder="Choisir ou taper article"></td>
+                <td><input type="number" class="input-inline art-qty" value="1" min="1"></td>
+                <td class="status-stock">-</td>
+                <td style="text-align:center;"><button onclick="this.parentElement.parentElement.remove()" style="color:red; background:none; border:none; font-size: 20px;">✕</button></td>`;
+        }
+
+        function ajouterLigneMateriauP2() {
+            const tbody = document.getElementById('tbody-materiaux-p2');
+            const row = tbody.insertRow();
+            row.innerHTML = `
+                <td><input type="text" class="input-inline art-name-p2" list="liste-articles-stock" placeholder="Choisir ou taper article"></td>
+                <td><input type="number" class="input-inline art-qty-p2" value="1" min="1"></td>
+                <td style="text-align:center;"><button onclick="this.parentElement.parentElement.remove()" style="color:red; background:none; border:none; font-size: 20px;">✕</button></td>`;
+        }
+
+        function verifierStocks() {
+            const rows = document.querySelectorAll('#tbody-materiaux tr');
+            rows.forEach(row => {
+                const nameInput = row.querySelector('.art-name');
+                const qtyInput = row.querySelector('.art-qty');
+                if(!nameInput || !qtyInput) return;
+                const name = nameInput.value.toLowerCase().trim();
+                const qtyReq = parseInt(qtyInput.value);
+                const statusTd = row.querySelector('.status-stock');
+                if (!name) return;
+                const match = currentStocks.find(s => s.nom.toLowerCase() === name || s.nom.toLowerCase().includes(name));
+                if (match) {
+                    statusTd.innerHTML = match.quantite >= qtyReq ? `<span class="stock-ok">OK (${match.quantite})</span>` : `<span class="stock-ko">Manque (${match.quantite})</span>`;
+                } else {
+                    statusTd.innerHTML = `<span class="stock-ko">Inconnu / Hors stock</span>`;
+                }
+            });
+        }
+
+        function commanderManquant() {
+            alert("Action : Le bon de commande numérique a été envoyé au magasinier pour les articles hors-stock.");
+        }
+
+        function ajouterLigneHeure(agentName, sameDay = false) {
+            let nomAInserer = "";
+            if (typeof agentName === 'string') {
+                nomAInserer = agentName;
+            }
+
+            const tbody = document.getElementById('tbody-heures');
+            let dateToUse = new Date().toISOString().split('T')[0];
+
+            if (sameDay === true && tbody.rows.length > 0) {
+                const derniereLigne = tbody.rows[tbody.rows.length - 1];
+                const lastDateInput = derniereLigne.querySelector('.h-date');
+                if (lastDateInput && lastDateInput.value) {
+                    dateToUse = lastDateInput.value;
+                }
+            }
+
+            const row = tbody.insertRow();
+
+            row.innerHTML = `
+                <td><input type="date" class="input-inline h-date" value="${dateToUse}"></td>
+                <td><input type="text" class="input-inline h-agent" list="liste-ouvriers" placeholder="Nom de l'agent"></td>
+                <td><input type="number" class="input-inline h-qty" value="8" step="0.5"></td>
+                <td style="text-align:center;"><button onclick="this.parentElement.parentElement.remove()" style="color:red; background:none; border:none; font-size: 20px;">✕</button></td>`;
+
+            if (nomAInserer !== "") {
+                row.querySelector('.h-agent').value = nomAInserer;
+            }
+        }
+
+        function finaliserIntervention() {
+            const materiaux = [];
+
+            document.querySelectorAll('#tbody-materiaux tr').forEach(row => {
+                const nom = row.querySelector('.art-name').value;
+                const qty = row.querySelector('.art-qty').value;
+                if (nom.trim() !== "") materiaux.push({ nom: nom, quantite: qty });
+            });
+
+            document.querySelectorAll('#tbody-materiaux-p2 tr').forEach(row => {
+                const nom = row.querySelector('.art-name-p2').value;
+                const qty = row.querySelector('.art-qty-p2').value;
+                if (nom.trim() !== "") materiaux.push({ nom: nom, quantite: qty });
+            });
+
+            const premierAgentInput = document.querySelector('.h-agent');
+            const nomOuvrier = premierAgentInput ? premierAgentInput.value : "Ouvrier non spécifié";
+            const numAtal = document.getElementById('modal-atal').innerText;
+
+            fetch('/magasin/api/sortie', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ atal: numAtal, ouvrier: nomOuvrier, materiaux: materiaux })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if(data.status === "success") {
+                    alert(`Succès : Stock mis à jour et intervention clôturée.`);
+                    fermerModal();
+                    location.reload();
+                } else {
+                    alert("Erreur lors de la mise à jour du stock.");
+                }
+            });
+        }
+
+        function fermerModal() { document.getElementById('interventionModal').style.display = 'none'; }
+        window.onclick = function(e) { if (e.target == document.getElementById('interventionModal')) fermerModal(); }
+    </script>
+{% endblock %}
