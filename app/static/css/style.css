@@ -1,0 +1,161 @@
+body {
+    font-family: Arial, sans-serif;
+    background-color: #f0f2f5; /* Fond légèrement plus doux et moderne */
+    margin: 0;
+    padding: 0;
+    color: #333;
+}
+
+.navbar {
+    background-color: #0056b3;
+    color: white;
+    padding: 15px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.1); /* Ajout d'une ombre sous la barre de navigation */
+}
+
+.navbar .logo {
+    font-weight: bold;
+    font-size: 1.2em;
+}
+
+.menu {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    gap: 15px;
+}
+
+.menu a {
+    color: white;
+    text-decoration: none;
+    font-weight: 500;
+    transition: opacity 0.2s;
+}
+
+.menu a:hover {
+    opacity: 0.8;
+}
+
+/* --- LE CONTENEUR PRINCIPAL PLUS STYLÉ --- */
+.container {
+    padding: 30px;
+    max-width: 900px;
+    margin: 40px auto;
+    background-color: #ffffff;
+    border-radius: 12px; /* Bords plus arrondis */
+    box-shadow: 0 8px 24px rgba(0,0,0,0.08); /* Ombre douce, large et moderne */
+    border: 1px solid #eaebec; /* Bordure très discrète */
+}
+
+.grid-menu {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 15px;
+}
+
+.btn-menu {
+    background-color: #007bff;
+    color: white;
+    text-align: center;
+    padding: 20px;
+    text-decoration: none;
+    border-radius: 8px;
+    font-weight: bold;
+    display: block;
+    transition: transform 0.2s, background-color 0.2s; /* Effet de transition fluide */
+}
+
+.btn-menu:hover {
+    background-color: #0056b3;
+    transform: translateY(-2px); /* Léger soulèvement au survol */
+}
+
+/* --- LES SOUS-CONTENEURS (CARTES) PLUS STYLÉS --- */
+.carte {
+    background: #fdfdfd;
+    padding: 20px;
+    margin-bottom: 20px;
+    border-radius: 10px;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.04);
+    border: 1px solid #f0f0f0;
+    transition: transform 0.3s ease, box-shadow 0.3s ease; /* Effet fluide */
+}
+
+.carte:hover {
+    transform: translateY(-4px); /* Soulèvement au survol */
+    box-shadow: 0 10px 20px rgba(0,0,0,0.08); /* Ombre qui s'agrandit */
+    background: #ffffff;
+}
+
+.btn {
+    background-color: #28a745;
+    color: white;
+    border: none;
+    padding: 10px 15px;
+    border-radius: 6px;
+    cursor: pointer;
+    width: 100%;
+    font-weight: bold;
+    transition: background-color 0.2s;
+}
+
+.btn:hover {
+    background-color: #218838;
+}
+
+.form-group {
+    margin-bottom: 15px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: bold;
+    color: #555;
+}
+
+.form-group input {
+    width: 100%;
+    padding: 10px;
+    box-sizing: border-box;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    transition: border-color 0.3s;
+}
+
+.form-group input:focus {
+    border-color: #007bff;
+    outline: none; /* Contour bleu au lieu du style par défaut lors de la saisie */
+}
+
+.btn-submit {
+    background-color: #0056b3;
+    color: white;
+    border: none;
+    padding: 12px 15px;
+    border-radius: 6px;
+    cursor: pointer;
+    width: 100%;
+    font-weight: bold;
+    font-size: 1.05em;
+    transition: background-color 0.2s;
+}
+
+.btn-submit:hover {
+    background-color: #004494;
+}
+
+/* --- BOÎTE DE CONNEXION --- */
+.login-box {
+    background-color: #ffffff;
+    padding: 40px;
+    border-radius: 12px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+    max-width: 400px;
+    margin: 60px auto; /* Pour bien la centrer s'il n'y a pas le container principal */
+    border: 1px solid #eaebec;
+}

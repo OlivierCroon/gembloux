@@ -1,10 +1,298 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <title>$Title$</title>
-</head>
-<body>
-$END$
-</body>
-</html>
+{% extends "base.html" %}
+
+{% block content %}
+    <style>
+        .table-magasin {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-top: 20px;
+        }
+
+        .table-magasin th, .table-magasin td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+
+        .table-magasin th {
+            background-color: #0056b3;
+            color: white;
+        }
+
+        .nom-marchandise {
+            color: #007bff;
+            text-decoration: underline;
+            cursor: pointer;
+        }
+
+        /* Styles Modale */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.6);
+        }
+
+        .modal-content {
+            background-color: #fff;
+            margin: 10% auto;
+            padding: 20px;
+            border-radius: 8px;
+            width: 90%;
+            max-width: 600px;
+            position: relative;
+        }
+
+        .close {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .table-sorties {
+            width: 100%;
+            margin-top: 15px;
+            font-size: 0.9em;
+        }
+
+        /* Nouveaux styles pour les formulaires */
+        .btn {
+            background-color: #28a745;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        .input-inline {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-sizing: border-box;
+            font-size: 16px;
+            margin-top: 5px;
+        }
+    </style>
+
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+        <h2>Gestion des Stocks - Magasin</h2>
+        <button class="btn" onclick="ouvrirEntreeStock()">+ Réception / Nouvel Article</button>
+    </div>
+
+    <table class="table-magasin">
+        <thead>
+            <tr>
+                <th>Code</th>
+                <th>Désignation</th>
+                <th>En Stock</th>
+            </tr>
+        </thead>
+        <tbody id="corps-table-stocks">
+            <!-- Rempli par JS -->
+        </tbody>
+    </table>
+
+    <!-- Modale pour l'historique des sorties -->
+    <div id="sortiesModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="fermerModal()">&times;</span>
+            <h3>Historique des sorties</h3>
+            <h4 id="modal-nom-article" style="color: #0056b3;"></h4>
+
+            <table class="table-magasin table-sorties">
+                <thead>
+                    <tr>
+                        <th>N° ATAL</th>
+                        <th>Date</th>
+                        <th>Ouvrier</th>
+                        <th style="width: 70px;">Qté</th>
+                    </tr>
+                </thead>
+                <tbody id="corps-table-sorties">
+                    <!-- Rempli par JS -->
+                </tbody>
+            </table>
+            <p id="msg-vide" style="display:none; text-align:center; padding: 20px;">Aucune sortie enregistrée pour cet article.</p>
+        </div>
+    </div>
+
+    <!-- Modale pour l'entrée de stock (Nouvelle) -->
+    <div id="entreeStockModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="fermerEntreeModal()">&times;</span>
+            <h3>Ajouter / Réceptionner au Stock</h3>
+
+            <div style="margin-bottom: 15px;">
+                <label><strong>Code Article :</strong> (Ex: MAT-001 ou nouveau)</label>
+                <input type="text" id="entree-code" class="input-inline" list="liste-codes-stock" placeholder="Saisir ou choisir un code">
+                <datalist id="liste-codes-stock"></datalist>
+            </div>
+
+            <div style="margin-bottom: 15px;">
+                <label><strong>Désignation :</strong> (Nom de la marchandise)</label>
+                <input type="text" id="entree-nom" class="input-inline" placeholder="Nom complet">
+            </div>
+
+            <div style="margin-bottom: 20px;">
+                <label><strong>Quantité réceptionnée :</strong></label>
+                <input type="number" id="entree-qty" class="input-inline" value="1" min="1">
+            </div>
+
+            <button class="btn" style="width: 100%; padding: 15px; font-size: 1.1em;" onclick="validerEntreeStock()">Valider l'entrée en stock</button>
+        </div>
+    </div>
+
+    <script>
+        // --- GESTION DES STOCKS PRINCIPALE ---
+        let currentStocksGlobal = [];
+
+        // Charger les stocks au démarrage
+        fetch('/magasin/api/stocks')
+            .then(response => response.json())
+            .then(data => {
+                currentStocksGlobal = data;
+                const tbody = document.getElementById('corps-table-stocks');
+                tbody.innerHTML = '';
+                data.forEach(item => {
+                    tbody.innerHTML += `
+                        <tr>
+                            <td>${item.code}</td>
+                            <td><span class="nom-marchandise" onclick="ouvrirSorties('${item.code}', '${item.nom}')">${item.nom}</span></td>
+                            <td><strong>${item.quantite}</strong></td>
+                        </tr>
+                    `;
+                });
+            });
+
+        // --- HISTORIQUE DES SORTIES ---
+        function ouvrirSorties(code, nom) {
+            document.getElementById('modal-nom-article').innerText = nom;
+            const tbodySorties = document.getElementById('corps-table-sorties');
+            const msgVide = document.getElementById('msg-vide');
+
+            tbodySorties.innerHTML = '';
+
+            fetch('/magasin/api/sorties/' + code)
+                .then(response => response.json())
+                .then(sorties => {
+                    if (sorties.length === 0) {
+                        msgVide.style.display = 'block';
+                        tbodySorties.parentElement.style.display = 'none';
+                    } else {
+                        msgVide.style.display = 'none';
+                        tbodySorties.parentElement.style.display = 'table';
+                        sorties.forEach(s => {
+                            const qteAffichee = s.quantite !== undefined ? s.quantite : '-';
+                            tbodySorties.innerHTML += `
+                                <tr>
+                                    <td>${s.atal}</td>
+                                    <td>${s.date}</td>
+                                    <td>${s.ouvrier}</td>
+                                    <td><strong>${qteAffichee}</strong></td>
+                                </tr>
+                            `;
+                        });
+                    }
+                    document.getElementById('sortiesModal').style.display = 'block';
+                });
+        }
+
+        function fermerModal() {
+            document.getElementById('sortiesModal').style.display = 'none';
+        }
+
+        // --- ENTRÉES ET NOUVEAUX ARTICLES (NOUVEAU) ---
+        function ouvrirEntreeStock() {
+            // Remplir le datalist avec les codes existants pour faciliter la saisie
+            const datalist = document.getElementById('liste-codes-stock');
+            datalist.innerHTML = '';
+            currentStocksGlobal.forEach(item => {
+                datalist.innerHTML += `<option value="${item.code}">${item.nom}</option>`;
+            });
+
+            // Réinitialiser les champs
+            document.getElementById('entree-code').value = '';
+            document.getElementById('entree-nom').value = '';
+            document.getElementById('entree-qty').value = '1';
+
+            document.getElementById('entreeStockModal').style.display = 'block';
+        }
+
+        function fermerEntreeModal() {
+            document.getElementById('entreeStockModal').style.display = 'none';
+        }
+
+        // Auto-remplissage du nom si le code existe déjà
+        document.getElementById('entree-code').addEventListener('input', function(e) {
+            const codeSaisi = e.target.value.trim();
+            const article = currentStocksGlobal.find(item => item.code === codeSaisi);
+            if (article) {
+                document.getElementById('entree-nom').value = article.nom;
+            }
+        });
+
+        function validerEntreeStock() {
+            const code = document.getElementById('entree-code').value.trim();
+            const nom = document.getElementById('entree-nom').value.trim();
+            const qty = parseInt(document.getElementById('entree-qty').value);
+
+            if (!code || !nom || isNaN(qty) || qty <= 0) {
+                alert("Veuillez remplir correctement tous les champs.");
+                return;
+            }
+
+            const data = {
+                code: code,
+                nom: nom,
+                quantite: qty
+            };
+
+            fetch('/magasin/api/entree', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            })
+            .then(response => {
+                if(response.ok) {
+                    return response.json();
+                }
+                throw new Error("Erreur serveur (Le backend doit être mis à jour)");
+            })
+            .then(res => {
+                if(res.status === "success") {
+                    alert("Stock ajouté avec succès !");
+                    fermerEntreeModal();
+                    location.reload();
+                } else {
+                    alert("Erreur: " + res.message);
+                }
+            })
+            .catch(error => {
+                alert("Attention : Le formulaire est prêt, mais il faut mettre à jour 'app/routes/magasin.py' pour recevoir ces données !");
+            });
+        }
+
+        // --- GESTION DES CLICS HORS MODALES ---
+        window.onclick = function(event) {
+            if (event.target == document.getElementById('sortiesModal')) {
+                fermerModal();
+            }
+            if (event.target == document.getElementById('entreeStockModal')) {
+                fermerEntreeModal();
+            }
+        }
+    </script>
+{% endblock %}
