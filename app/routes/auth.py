@@ -34,7 +34,7 @@ def login():
                 return redirect(url_for('interventions.cm_dashboard'))
             else:
                 # Les ouvriers vont directement sur la liste des interventions
-                return redirect(url_for('patrimoine.page_index'))
+                return redirect(url_for('patrimoine.index'))
         else:
             error = "Identifiant ou mot de passe incorrect."
 
